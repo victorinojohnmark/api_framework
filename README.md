@@ -63,10 +63,10 @@ Define all API endpoints in `routes/api.php`. The framework supports standard HT
 // routes/api.php
 
 // GET Request
-$router->get('/health', 'App\Controllers\SystemController@status');
+$router->get('/health', 'SystemController@status');
 
 // POST Request
-$router->post('/auth/login', 'App\Controllers\AuthController@login');
+$router->post('/auth/login', 'AuthController@login');
 
 ```
 
@@ -74,11 +74,11 @@ $router->post('/auth/login', 'App\Controllers\AuthController@login');
 You can capture segments of the URL using `{curly_braces}`.
 ```php
 // Capture a single ID
-$router->get('/users/{id}', 'App\Controllers\UserController@show');
+$router->get('/users/{id}', 'UserController@show');
 
 // Capture multiple parameters
 // URL Example: /projects/10/tasks/55
-$router->get('/projects/{project_id}/tasks/{task_id}', 'App\Controllers\TaskController@show');
+$router->get('/projects/{project_id}/tasks/{task_id}', 'TaskController@show');
 ```
 
 ---
@@ -166,3 +166,130 @@ The `Core\Controller` provides these built-in methods:
   * Retrieves data from JSON body, `$_POST`, or `$_GET`.
 
   * Example: `$this->input('email')`.
+
+---
+
+## 4. Database & Query Builder
+
+The framework includes a powerful, chainable Query Builder. It returns results as standard PHP Objects (`stdClass`), allowing clean arrow syntax (e.g., `$user->email`).
+
+### Accessing the Database
+In any Controller, use `$this->db` to start a query.
+
+### Basic Queries (SELECT)
+
+**Get all rows:**
+
+```php
+$users = $this->db->table('users')->get();
+```
+
+#### Get a single row:
+
+```php
+$user = $this->db->table('users')->where('id', 1)->first();
+echo $user->name; // Access as object
+```
+
+#### Select specific columns:
+
+```php
+// Array syntax
+$this->db->table('users')->select(['id', 'email'])->get();
+
+// String syntax (useful for joins)
+$this->db->table('users')->select('users.id, projects.name')->get();
+```
+
+### Filtering (WHERE)
+#### Standard Where:
+
+```php
+$this->db->table('products')
+    ->where('price', '>', 100)
+    ->where('status', 'active') // defaults to '='
+    ->get();
+```
+
+#### Raw Where String: Useful for hardcoded checks or complex logic.
+```php
+$this->db->table('users')->where("id > 50 AND role = 'admin'")->get();
+```
+
+#### Complex Filtering (whereRaw)
+Use this when you need complex SQL logic (like brackets or OR conditions) mixed with variables. 
+**Always use `?` for variables.**
+
+```php
+$age = 18;
+$role = 'admin';
+
+$this->db->table('users')
+    ->whereRaw("(age > ? OR role = ?)", [$age, $role])
+    ->get();
+```
+
+### Joins
+#### Support for `join`, `leftJoin`, and `rightJoin`
+```php
+$data = $this->db->table('projects')
+    ->select('projects.title, users.email')
+    ->leftJoin('users', 'projects.owner_id = users.id')
+    ->get();
+```
+
+### Pagination and Sorting
+```php
+$users = $this->db->table('users')
+    ->orderBy('created_at', 'DESC')
+    ->limit(10)
+    ->offset(20) // Skip first 20 records (Page 3)
+    ->get();
+```
+
+### Write Operations
+**Insert:** Returns the last inserted ID.
+```php
+$newId = $this->db->table('users')->insert([
+    'name' => 'John Doe',
+    'email' => 'john@example.com'
+]);
+```
+
+**Update:** Returns `true` on success
+```php
+$this->db->table('users')
+    ->where('id', 5)
+    ->update(['status' => 'inactive']);
+```
+
+**Delete:**
+```php
+$this->db->table('users')->where('id', 5)->delete();
+```
+
+**Advanced Features**
+**Raw SQL Queries:** For complex reports or optimization. Always use ? placeholders for safety.
+```php
+$sql = "SELECT count(*) as total FROM users WHERE created_at > ?";
+$result = $this->db->query($sql, ['2023-01-01']);
+```
+
+**Debugging (`getQuery`):** See the generated SQL without running it.
+```php
+$debug = $this->db->table('users')
+    ->where('id', 1)
+    ->getQuery();
+
+// Output: ['sql' => 'SELECT * FROM users WHERE id = ?', 'params' => [1]]
+```
+
+
+
+
+
+
+
+
+
+
