@@ -229,8 +229,8 @@ $this->db->table('users')
     ->get();
 ```
 
-### 3. Joins
-#### 3.1 Support for `join`, `leftJoin`, and `rightJoin`
+### 4.4 Joins
+#### 4.4.1 Support for `join`, `leftJoin`, and `rightJoin`
 ```php
 $data = $this->db->table('projects')
     ->select('projects.title, users.email')
@@ -238,7 +238,7 @@ $data = $this->db->table('projects')
     ->get();
 ```
 
-### 4. Pagination and Sorting
+### 4.5 Pagination and Sorting
 ```php
 $users = $this->db->table('users')
     ->orderBy('created_at', 'DESC')
@@ -247,8 +247,8 @@ $users = $this->db->table('users')
     ->get();
 ```
 
-### 5. Write Operations
-**5.1 Insert:** Returns the last inserted ID.
+### 4.6 Write Operations
+**4.6.1 Insert:** Returns the last inserted ID.
 ```php
 $newId = $this->db->table('users')->insert([
     'name' => 'John Doe',
@@ -256,26 +256,26 @@ $newId = $this->db->table('users')->insert([
 ]);
 ```
 
-**5.2 Update:** Returns `true` on success
+**4.6.2 Update:** Returns `true` on success
 ```php
 $this->db->table('users')
     ->where('id', 5)
     ->update(['status' => 'inactive']);
 ```
 
-**5.3 Delete:**
+**4.6.3 Delete:**
 ```php
 $this->db->table('users')->where('id', 5)->delete();
 ```
 
-### 6. Advanced Features
-**6.1 Raw SQL Queries:** For complex reports or optimization. Always use ? placeholders for safety.
+### 4.7 Advanced Features
+**4.7.1 Raw SQL Queries:** For complex reports or optimization. Always use ? placeholders for safety.
 ```php
 $sql = "SELECT count(*) as total FROM users WHERE created_at > ?";
 $result = $this->db->query($sql, ['2023-01-01']);
 ```
 
-**6.2 Debugging (`getQuery`):** See the generated SQL without running it.
+**4.7.2 Debugging (`getQuery`):** See the generated SQL without running it.
 ```php
 $debug = $this->db->table('users')
     ->where('id', 1)
