@@ -4,7 +4,7 @@ A lightweight, self-contained, no-composer MVC framework designed for speed and 
 
 ## 1. Installation & Setup
 
-### Directory Structure
+### 1.1 Directory Structure
 Ensure your project looks like this:
 
 ```text
@@ -22,7 +22,7 @@ Ensure your project looks like this:
 └── .htaccess              # Apache Config (Optional)
 ```
 
-### Configuration (`config.php`)
+### 1.2 Configuration (`config.php`)
 Set your environment variables in the root `config.php` file.
 
 ```php
@@ -44,7 +44,7 @@ return [
 ];
 ```
 
-### Running Locally
+### 1.3 Running Locally
 You don't need Apache for local work. Use the built-in command line tool:
 
 ```bash
@@ -58,7 +58,7 @@ php -S localhost:8000 serve.php
 ## 2. Routing
 Define all API endpoints in `routes/api.php`. The framework supports standard HTTP verbs and dynamic parameters.
 
-### Basic Routes
+### 2.1 Basic Routes
 ```php
 // routes/api.php
 
@@ -70,7 +70,7 @@ $router->post('/auth/login', 'AuthController@login');
 
 ```
 
-### Dynamic Parameters
+### 2.2 Dynamic Parameters
 You can capture segments of the URL using `{curly_braces}`.
 ```php
 // Capture a single ID
@@ -88,7 +88,7 @@ Controllers handle the incoming request and return a JSON response. All controll
 
 #### Location: `app/Controllers/`
 
-#### Example Controller
+### 3.1 Example Controller
 
 ```php
 <?php
@@ -112,10 +112,10 @@ class UserController extends Controller
     }
 
     /**
-     * GET /users/{id}
-     * The $id argument matches the route parameter {id}
+     * GET /users/{user_id}
+     * The $useId argument matches the route parameter {user_id}
      */
-    public function show($userId) # {user_id}
+    public function show($userId)
     {
         // Mock data logic
         if ($userId == 999) {
@@ -150,7 +150,7 @@ class UserController extends Controller
 }
 ```
 
-### Helper Methods
+### 3.2 Helper Methods
 The `Core\Controller` provides these built-in methods:
 
 * `$this->json($data, $status = 200)`
@@ -173,10 +173,10 @@ The `Core\Controller` provides these built-in methods:
 
 The framework includes a powerful, chainable Query Builder. It returns results as standard PHP Objects (`stdClass`), allowing clean arrow syntax (e.g., `$user->email`).
 
-### Accessing the Database
+### 4.1 Accessing the Database
 In any Controller, use `$this->db` to start a query.
 
-### Basic Queries (SELECT)
+### 4.2 Basic Queries (SELECT)
 
 **Get all rows:**
 
@@ -201,8 +201,8 @@ $this->db->table('users')->select(['id', 'email'])->get();
 $this->db->table('users')->select('users.id, projects.name')->get();
 ```
 
-### Filtering (WHERE)
-#### Standard Where:
+### 4.3 Filtering (WHERE)
+#### 4.3.1 Standard Where:
 
 ```php
 $this->db->table('products')
@@ -211,12 +211,12 @@ $this->db->table('products')
     ->get();
 ```
 
-#### Raw Where String: Useful for hardcoded checks or complex logic.
+#### 4.3.2 Raw Where String: Useful for hardcoded checks or complex logic.
 ```php
 $this->db->table('users')->where("id > 50 AND role = 'admin'")->get();
 ```
 
-#### Complex Filtering (whereRaw)
+#### 4.3.3 Complex Filtering (whereRaw)
 Use this when you need complex SQL logic (like brackets or OR conditions) mixed with variables. 
 **Always use `?` for variables.**
 
@@ -229,8 +229,8 @@ $this->db->table('users')
     ->get();
 ```
 
-### Joins
-#### Support for `join`, `leftJoin`, and `rightJoin`
+### 3. Joins
+#### 3.1 Support for `join`, `leftJoin`, and `rightJoin`
 ```php
 $data = $this->db->table('projects')
     ->select('projects.title, users.email')
@@ -238,7 +238,7 @@ $data = $this->db->table('projects')
     ->get();
 ```
 
-### Pagination and Sorting
+### 4. Pagination and Sorting
 ```php
 $users = $this->db->table('users')
     ->orderBy('created_at', 'DESC')
@@ -247,8 +247,8 @@ $users = $this->db->table('users')
     ->get();
 ```
 
-### Write Operations
-**Insert:** Returns the last inserted ID.
+### 5. Write Operations
+**5.1 Insert:** Returns the last inserted ID.
 ```php
 $newId = $this->db->table('users')->insert([
     'name' => 'John Doe',
@@ -256,26 +256,26 @@ $newId = $this->db->table('users')->insert([
 ]);
 ```
 
-**Update:** Returns `true` on success
+**5.2 Update:** Returns `true` on success
 ```php
 $this->db->table('users')
     ->where('id', 5)
     ->update(['status' => 'inactive']);
 ```
 
-**Delete:**
+**5.3 Delete:**
 ```php
 $this->db->table('users')->where('id', 5)->delete();
 ```
 
-**Advanced Features**
-**Raw SQL Queries:** For complex reports or optimization. Always use ? placeholders for safety.
+### 6. Advanced Features
+**6.1 Raw SQL Queries:** For complex reports or optimization. Always use ? placeholders for safety.
 ```php
 $sql = "SELECT count(*) as total FROM users WHERE created_at > ?";
 $result = $this->db->query($sql, ['2023-01-01']);
 ```
 
-**Debugging (`getQuery`):** See the generated SQL without running it.
+**6.2 Debugging (`getQuery`):** See the generated SQL without running it.
 ```php
 $debug = $this->db->table('users')
     ->where('id', 1)
@@ -283,8 +283,77 @@ $debug = $this->db->table('users')
 
 // Output: ['sql' => 'SELECT * FROM users WHERE id = ?', 'params' => [1]]
 ```
+---
 
+## 5. Database Migrations
 
+The framework includes a custom command-line tool for managing database schemas, similar to Laravel's artisan.
+
+### Directory Structure
+Migration tools are located in the `database/` folder:
+* `database/migrations/` - Stores your migration files.
+* `database/create_migration.php` - Generates new migration files.
+* `database/migrate.php` - Runs pending migrations (UP).
+* `database/rollback.php` - Reverts the last migration (DOWN).
+`
+### 5.1 Creating a Migration
+Use the generator script to create a timestamped file.
+
+```bash
+php database/create_migration.php CreateUsersTable
+```
+This generates a file in `database/migrations/` with default utility columns (created_at, updated_at, active, etc.).
+
+### 5.2 Editing the Migration
+Open the generated file. You will see two methods: `up()` and `down()`.
+
+**Creating a Table:**
+```php
+public function up($pdo)
+{
+    $sql = "CREATE TABLE users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(50) NOT NULL,
+        email VARCHAR(100) NOT NULL,
+        
+        # Default Utilities (Included by generator)
+        active TINYINT(1) DEFAULT 1,
+        created_at INT NULL,
+        updated_at INT NULL
+    )";
+    $pdo->exec($sql);
+}
+
+public function down($pdo)
+{
+    $pdo->exec("DROP TABLE IF EXISTS users");
+}
+```
+
+**Modifying a Table (Adding Columns):** Change the SQL to use `ALTER TABLE`.
+```php
+public function up($pdo)
+{
+    $pdo->exec("ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL AFTER email");
+}
+
+public function down($pdo)
+{
+    $pdo->exec("ALTER TABLE users DROP COLUMN phone");
+}
+```
+
+### 5.3 Running Migrations
+Execute all pending migrations:
+```bash
+php database/migrate.php
+```
+
+### 5.4 Rolling Back
+Undo the **last** batch of migrations (executes the `down()` method):
+```bash
+php database/rollback.php
+```
 
 
 
