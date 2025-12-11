@@ -1,5 +1,4 @@
 <?php
-// database/create_migration.php
 
 if ($argc < 2) {
     echo "Error: Please provide a migration name.\n";
@@ -20,42 +19,36 @@ if (!is_dir($folder)) {
 
 $filepath = $folder . $filename;
 
-// 2. Template Content
+// 2. Template Content (Updated for Schema Builder)
 $template = "<?php
+use Core\Database\Schema;
+use Core\Database\Blueprint;
 
 class {$name}
 {
     /**
      * Run the migrations.
-     * @param PDO \$pdo
      */
-    public function up(\$pdo)
+    public function up()
     {
-        \$sql = \"CREATE TABLE table_name (
-            id INT AUTO_INCREMENT PRIMARY KEY,
+        Schema::create('table_name', function (Blueprint \$table) {
+            \$table->id();
             
-            # ADD YOUR COLUMNS HERE
+            // \$table->string('name');
             
             # Default Utilities
-            active TINYINT(1) DEFAULT 1,
-            created_by INT NULL,
-            created_at INT NULL,
-            updated_by INT NULL,
-            updated_at INT NULL,
-            deleted_by INT NULL,
-            deleted_at INT NULL
-        )\";
-
-        \$pdo->exec(\$sql);
+            \$table->boolean('active')->default(1);
+            \$table->timestamps(); // created_at, created_by, updated_at, updated_by
+            \$table->softDelete(); // deleted_at, deleted_by
+        });
     }
 
     /**
      * Reverse the migrations.
-     * @param PDO \$pdo
      */
-    public function down(\$pdo)
+    public function down()
     {
-        \$pdo->exec(\"DROP TABLE IF EXISTS table_name\");
+        Schema::dropIfExists('table_name');
     }
 }
 ";
