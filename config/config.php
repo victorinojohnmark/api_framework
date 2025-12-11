@@ -1,4 +1,6 @@
 <?php
+// config/config.php
+
 return [
     # App Settings
     'app_name' => getenv('APP_NAME') ?: 'Project Name',
@@ -12,5 +14,5 @@ return [
     'db_pass' => getenv('DB_PASS') ?: '',
     
     # Paths
-    'root_path' => __DIR__,
+    'root_path' => dirname(__DIR__),
 ];

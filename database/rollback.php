@@ -10,7 +10,7 @@ if (file_exists($envFile)) {
     Core\DotEnv::load($envFile);
 }
 
-$config = require ROOT_PATH . '/config.php';
+$config = require ROOT_PATH . '/config/config.php';
 
 // 2. Connect to DB
 try {

@@ -29,10 +29,11 @@ if (!file_exists($envFile)) {
 DotEnv::load($envFile);
 
 # 3. LOAD CONFIGURATION
-$configFile = ROOT_PATH . '/config.php';
+$configFile = ROOT_PATH . '/config/config.php';
+
 if (!file_exists($configFile)) {
     header("HTTP/1.1 500 Internal Server Error");
-    die("Error: config.php not found.");
+    die("Error: config/config.php not found.");
 }
 $config = require $configFile;
 define('APP_CONFIG', $config);

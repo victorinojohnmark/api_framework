@@ -20,7 +20,7 @@ class Database
 
     public function __construct()
     {
-        $config = defined('APP_CONFIG') ? APP_CONFIG : require __DIR__ . '/../config.php';
+        $config = defined('APP_CONFIG') ? APP_CONFIG : require __DIR__ . '/../config/config.php';
 
         try {
             $dsn = "mysql:host={$config['db_host']};dbname={$config['db_name']};charset=utf8mb4";
