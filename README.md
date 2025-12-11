@@ -287,7 +287,7 @@ $debug = $this->db->table('users')
 
 ## 5. Database Migrations
 
-The framework includes a custom command-line tool for managing database schemas, similar to Laravel's artisan.
+The framework includes a powerful Schema Builder and command-line tools for managing database structure, inspired by Laravel.
 
 ### Directory Structure
 Migration tools are located in the `database/` folder:
@@ -295,51 +295,74 @@ Migration tools are located in the `database/` folder:
 * `database/create_migration.php` - Generates new migration files.
 * `database/migrate.php` - Runs pending migrations (UP).
 * `database/rollback.php` - Reverts the last migration (DOWN).
-`
+
 ### 5.1 Creating a Migration
 Use the generator script to create a timestamped file.
 
 ```bash
 php database/create_migration.php CreateUsersTable
 ```
-This generates a file in `database/migrations/` with default utility columns (created_at, updated_at, active, etc.).
+
+This generates a file in `database/migrations/` pre-filled with the Schema Builder template and default utility columns (`active`, `timestamps`, `softDelete`).
 
 ### 5.2 Editing the Migration
-Open the generated file. You will see two methods: `up()` and `down()`.
+The framework uses a fluent `Schema` and `Blueprint` system, so you don't have to write raw SQL.
 
 **Creating a Table:**
 ```php
-public function up($pdo)
+use Core\Database\Schema;
+use Core\Database\Blueprint;
+
+public function up()
 {
-    $sql = "CREATE TABLE users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(50) NOT NULL,
-        email VARCHAR(100) NOT NULL,
+    Schema::create('users', function (Blueprint $table) {
+        $table->id(); // Auto-incrementing Primary Key
+        
+        $table->string('username', 50);
+        $table->string('email', 100)->unique();
+        $table->integer('age')->nullable();
         
         # Default Utilities (Included by generator)
-        active TINYINT(1) DEFAULT 1,
-        created_at INT NULL,
-        updated_at INT NULL
-    )";
-    $pdo->exec($sql);
+        $table->boolean('active')->default(1);
+        $table->timestamps(); // created_at, created_by, updated_at, updated_by
+        $table->softDelete(); // deleted_at, deleted_by
+    });
 }
 
-public function down($pdo)
+public function down()
 {
-    $pdo->exec("DROP TABLE IF EXISTS users");
+    Schema::dropIfExists('users');
 }
 ```
 
-**Modifying a Table (Adding Columns):** Change the SQL to use `ALTER TABLE`.
+**Modifying a Table:**
+Use `Schema::table()` to add, modify, or drop columns.
+
 ```php
-public function up($pdo)
+public function up()
 {
-    $pdo->exec("ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL AFTER email");
+    Schema::table('users', function (Blueprint $table) {
+        // Add a new column
+        $table->string('phone', 20)->nullable();
+        
+        // Modify an existing column (requires ->change())
+        $table->string('username', 100)->change();
+        
+        // Rename a column (3rd argument REQUIRED for MySQL 5 compatibility)
+        // You must re-state the full column definition
+        $table->renameColumn('location', 'address', 'VARCHAR(255) DEFAULT NULL');
+        
+        // Drop a column
+        $table->dropColumn('age');
+    });
 }
 
-public function down($pdo)
+public function down()
 {
-    $pdo->exec("ALTER TABLE users DROP COLUMN phone");
+    Schema::table('users', function (Blueprint $table) {
+        $table->dropColumn('phone');
+        // Revert other changes...
+    });
 }
 ```
 
@@ -350,7 +373,7 @@ php database/migrate.php
 ```
 
 ### 5.4 Rolling Back
-Undo the **last** batch of migrations (executes the `down()` method):
+Undo the last batch of migrations (executes the `down()` method):
 ```bash
 php database/rollback.php
 ```
