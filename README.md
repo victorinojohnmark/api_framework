@@ -355,8 +355,358 @@ Undo the **last** batch of migrations (executes the `down()` method):
 php database/rollback.php
 ```
 
+---
 
+## 6. Middleware
 
+Middleware allows you to intercept requests before they reach your controller. This is essential for Authentication, Rate Limiting, and Access Control.
+
+### 6.1 Creating Middleware
+Middleware classes must implement the `Core\Middleware` interface and define a `handle()` method.
+
+**Location:** `app/Middleware/`
+
+**Example:** `app/Middleware/AuthMiddleware.php`
+```php
+<?php
+namespace App\Middleware;
+
+use Core\Middleware;
+use Core\JWT;
+
+class AuthMiddleware implements Middleware
+{
+    public function handle()
+    {
+        // 1. Check for Authorization Header
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? null;
+
+        if (!$authHeader || strpos($authHeader, 'Bearer ') !== 0) {
+            $this->unauthorized('Token missing');
+        }
+
+        // 2. Decode Token
+        $token = substr($authHeader, 7);
+        $payload = JWT::decode($token);
+
+        if (!$payload) {
+            $this->unauthorized('Invalid Token');
+        }
+
+        // 3. Inject User ID into Global Request
+        $_REQUEST['auth_user_id'] = $payload->sub;
+    }
+
+    private function unauthorized($msg)
+    {
+        header("Content-Type: application/json");
+        http_response_code(401);
+        echo json_encode(['error' => $msg]);
+        exit(); // Stop execution
+    }
+}
+```
+
+### 6.2 Registering Middleware
+Map your middleware classes to short aliases in the configuration file.
+**File:** `config/middleware.php`
+
+```php
+return [
+    'auth'  => \App\Middleware\AuthMiddleware::class,
+    'admin' => \App\Middleware\AdminMiddleware::class,
+];
+```
+
+### 6.3 Applying Middleware
+**Single Route:** Pass the alias as the third argument.
+
+```php
+$router->get('/profile', 'UserController@profile', ['auth']);
+```
+
+**Route Groups:** Apply middleware (and URL prefixes) to a block of routes.
+```php
+$router->group(['prefix' => '/api/v1', 'middleware' => ['auth']], function($router) {
+    
+    // URL: /api/v1/users (Protected)
+    $router->get('/users', 'UserController@index');
+    
+    // URL: /api/v1/orders (Protected)
+    $router->get('/orders', 'OrderController@index');
+    
+});
+```
+
+---
+
+## 7. Authentication (JWT)
+The framework includes a native, composer-free JWT Helper.
+
+**Configuration**
+Add your secret key to your `.env` file.
+
+```TOML
+JWT_SECRET=YourSuperSecretKeyHere
+```
+
+**issuing Tokens (Login)**
+In your `AuthController`, use the `Core\JWT` class to generate a token.
+```php
+use Core\JWT;
+
+public function login()
+{
+    // ... validate user credentials ...
+
+    $payload = [
+        'sub' => $user->id,      // Subject (User ID)
+        'iat' => time(),         // Issued At
+        'exp' => time() + 3600   // Expiration (1 hour)
+    ];
+
+    $token = JWT::encode($payload);
+
+    return $this->json(['token' => $token]);
+}
+```
+
+---
+
+## 8. Authorization & RBAC
+
+The framework implements a robust Role-Based Access Control (RBAC) system. It uses specific database tables (`users`, `roles`, `permissions`) to manage access dynamically.
+
+### Step 1: Database Setup
+You need to create the `users` table and the RBAC tables.
+
+**1. Generate the Files:**
+```bash
+php database/create_migration.php CreateUsersTable
+php database/create_migration.php CreateRbacTables
+```
+
+### 8.2 Paste Schema:
+**File:** `database/migrations/xxxx_CreateUsersTable.php`
+```php
+<?php
+
+class CreateUsersTable
+{
+    public function up($pdo)
+    {
+        $sql = "CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            email VARCHAR(150) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL,
+            active TINYINT(1) DEFAULT 1,
+            created_by INT NULL,
+            created_at INT NULL,
+            updated_by INT NULL,
+            updated_at INT NULL,
+            deleted_by INT NULL,
+            deleted_at INT NULL
+        )";
+
+        $pdo->exec($sql);
+    }
+
+    public function down($pdo)
+    {
+        $pdo->exec("DROP TABLE IF EXISTS users");
+    }
+}
+```
+
+**File:** `database/migrations/xxxx_CreateRbacTables.php`
+```php
+<?php
+
+class CreateRbacTables
+{
+    public function up($pdo)
+    {
+        # Roles Table (e.g., 'admin', 'editor')
+        $pdo->exec("CREATE TABLE IF NOT EXISTS roles (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(50) NOT NULL UNIQUE,
+            description VARCHAR(255) NULL
+        )");
+
+        # Permissions Table (e.g., 'edit-profile', 'delete-users')
+        $pdo->exec("CREATE TABLE IF NOT EXISTS permissions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(50) NOT NULL UNIQUE,
+            description VARCHAR(255) NULL
+        )");
+
+        # User -> Roles (Many-to-Many)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_roles (
+            user_id INT NOT NULL,
+            role_id INT NOT NULL,
+            PRIMARY KEY (user_id, role_id)
+        )");
+
+        # Role -> Permissions (Many-to-Many)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS role_permissions (
+            role_id INT NOT NULL,
+            permission_id INT NOT NULL,
+            PRIMARY KEY (role_id, permission_id)
+        )");
+    }
+
+    public function down($pdo)
+    {
+        $pdo->exec("DROP TABLE IF EXISTS role_permissions");
+        $pdo->exec("DROP TABLE IF EXISTS user_roles");
+        $pdo->exec("DROP TABLE IF EXISTS permissions");
+        $pdo->exec("DROP TABLE IF EXISTS roles");
+    }
+}
+
+```
+
+### 8.3 Run Migrations:
+```bash
+php database/migrate.php
+```
+
+#### Step 2: The `auth()` Helper     
+Once your database is set up, you can access the current authenticated user's details, roles, and permissions globally using the auth() helper.
+
+**1. Get Current User**
+```php
+$userId = auth()->id();
+$userObj = auth()->user(); // Returns DB row object
+```
+
+**2. Check Permissions** Checks if the user has a specific permission (via any of their assigned roles).
+```php
+if (auth()->can('edit_posts')) {
+    // Allow action
+}
+```
+
+**3. Check Roles**
+```php
+if (auth()->hasRole('admin')) {
+    // Admin only logic
+}
+```
+
+**4. Get All Roles/Permissions** Useful for sending back to the frontend on login.
+```php
+$roles = auth()->roles();            // ['admin', 'editor']
+$perms = auth()->permissions();      // ['create_post', 'delete_user']
+```
+
+#### Step 3: Usage in Controller
+```php
+public function destroy($id)
+{
+    // 1. Authentication Check (Middleware handles this, but auth() provides info)
+    if (!auth()) {
+        return $this->error('Not logged in', 401);
+    }
+
+    // 2. Authorization Check
+    if (!auth()->can('delete_users')) {
+        return $this->error('Permission denied', 403);
+    }
+
+    $this->db->table('users')->where('id', $id)->delete();
+    return $this->json(['message' => 'Deleted']);
+}
+```
+
+---
+
+## 9. Database Seeding
+
+Seeders allow you to populate your database with initial data (like Admin accounts or default settings).
+
+### 9.1 Seeder Engine
+The framework includes a seeder runner located at `database/seed.php`.
+
+### 9.2 Creating a Seeder
+Create a class file in `database/seeds/`. The class name must match the filename.
+
+**File:** `database/seeds/AdminSeeder.php`
+
+```php
+<?php
+
+class AdminSeeder
+{
+    public function run($pdo)
+    {
+        # Configuration
+        $lastName = 'User';
+        $firstName = 'Admin';
+        $email = 'admin@admin.com';
+        $password = 'password';
+
+        // 1. Create 'admin' Role
+        $stmt = $pdo->prepare("SELECT id FROM roles WHERE name = ?");
+        $stmt->execute(['admin']);
+        $roleId = $stmt->fetchColumn();
+
+        if (!$roleId) {
+            $stmt = $pdo->prepare("INSERT INTO roles (name, description) VALUES (?, ?)");
+            $stmt->execute(['admin', 'Super Administrator']);
+            $roleId = $pdo->lastInsertId();
+            echo " [Role Created] ";
+        } else {
+            echo " [Role Exists] ";
+        }
+
+        // 2. Create Admin User
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $userId = $stmt->fetchColumn();
+
+        if (!$userId) {
+            $password = password_hash($password, PASSWORD_BCRYPT);
+            
+            // CHANGED: first_name and last_name
+            $sql = "INSERT INTO users (first_name, last_name, email, password, active, created_at) 
+                    VALUES (?, ?, ?, ?, 1, ?)";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$firstName, $lastName, $email, $password, time()]);
+            
+            $userId = $pdo->lastInsertId();
+            echo " [User Created] ";
+        } else {
+            echo " [User Exists] ";
+        }
+
+        // 3. Assign Role
+        $stmt = $pdo->prepare("SELECT * FROM user_roles WHERE user_id = ? AND role_id = ?");
+        $stmt->execute([$userId, $roleId]);
+        
+        if (!$stmt->fetch()) {
+            $stmt = $pdo->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)");
+            $stmt->execute([$userId, $roleId]);
+            echo " [Role Assigned]";
+        }
+    }
+}
+```
+
+### 9.3 Running Seeders
+Run all seeders in the folder:
+```bash
+php database/seed.php
+```
+
+Run a specific seeder:
+```bash
+php database/seed.php AdminSeeder
+```
 
 
 
