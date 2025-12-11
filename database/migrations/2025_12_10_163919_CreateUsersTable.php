@@ -1,19 +1,15 @@
 <?php
 
-class CreateUserTable
+class CreateUsersTable
 {
-    /**
-     * Run the migrations.
-     * @param PDO $pdo
-     */
     public function up($pdo)
     {
-        $sql = "CREATE TABLE table_name (
+        $sql = "CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            
-            # ADD YOUR COLUMNS HERE
-            
-            # Default Utilities
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            email VARCHAR(150) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL,
             active TINYINT(1) DEFAULT 1,
             created_by INT NULL,
             created_at INT NULL,
@@ -26,12 +22,8 @@ class CreateUserTable
         $pdo->exec($sql);
     }
 
-    /**
-     * Reverse the migrations.
-     * @param PDO $pdo
-     */
     public function down($pdo)
     {
-        $pdo->exec("DROP TABLE IF EXISTS table_name");
+        $pdo->exec("DROP TABLE IF EXISTS users");
     }
 }
