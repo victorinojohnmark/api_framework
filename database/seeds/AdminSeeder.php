@@ -2,56 +2,66 @@
 
 class AdminSeeder
 {
-    public function run($pdo)
+    /**
+     * @param \Core\Database $db
+     */
+    public function run($db)
     {
-        # Configuration
-        $lastName = 'User';
+        // Configuration
         $firstName = 'Admin';
-        $email = 'admin@admin.com';
-        $password = 'password';
+        $lastName  = 'User';
+        $email     = 'admin@admin.com';
+        $password  = 'password';
 
+        // ----------------------------------------
         // 1. Create 'admin' Role
-        $stmt = $pdo->prepare("SELECT id FROM roles WHERE name = ?");
-        $stmt->execute(['admin']);
-        $roleId = $stmt->fetchColumn();
+        // ----------------------------------------
+        $role = $db->table('roles')->where('name', 'admin')->first();
 
-        if (!$roleId) {
-            $stmt = $pdo->prepare("INSERT INTO roles (name, description) VALUES (?, ?)");
-            $stmt->execute(['admin', 'Super Administrator']);
-            $roleId = $pdo->lastInsertId();
-            echo " [Role Created] ";
+        if (!$role) {
+            $roleId = $db->table('roles')->insert([
+                'name' => 'admin', 
+                'description' => 'Super Administrator'
+            ]);
+            echo " [Role Created]";
         } else {
-            echo " [Role Exists] ";
+            $roleId = $role->id;
+            echo " [Role Exists]";
         }
 
+        // ----------------------------------------
         // 2. Create Admin User
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        $userId = $stmt->fetchColumn();
+        // ----------------------------------------
+        $user = $db->table('users')->where('email', $email)->first();
 
-        if (!$userId) {
-            $password = password_hash($password, PASSWORD_BCRYPT);
-            
-            // CHANGED: first_name and last_name
-            $sql = "INSERT INTO users (first_name, last_name, email, password, active, created_at) 
-                    VALUES (?, ?, ?, ?, 1, ?)";
-            
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$firstName, $lastName, $email, $password, time()]);
-            
-            $userId = $pdo->lastInsertId();
-            echo " [User Created] ";
+        if (!$user) {
+            $userId = $db->table('users')->insert([
+                'first_name' => $firstName,
+                'last_name'  => $lastName,
+                'email'      => $email,
+                'password'   => password_hash($password, PASSWORD_BCRYPT),
+                'active'     => 1,
+                'created_at' => time()
+            ]);
+            echo " [User Created]";
         } else {
-            echo " [User Exists] ";
+            $userId = $user->id;
+            echo " [User Exists]";
         }
 
-        // 3. Assign Role
-        $stmt = $pdo->prepare("SELECT * FROM user_roles WHERE user_id = ? AND role_id = ?");
-        $stmt->execute([$userId, $roleId]);
+        // ----------------------------------------
+        // 3. Assign Role to User
+        // ----------------------------------------
+        $hasRole = $db->table('user_roles')
+                      ->where('user_id', $userId)
+                      ->where('role_id', $roleId)
+                      ->first();
         
-        if (!$stmt->fetch()) {
-            $stmt = $pdo->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)");
-            $stmt->execute([$userId, $roleId]);
+        if (!$hasRole) {
+            $db->table('user_roles')->insert([
+                'user_id' => $userId,
+                'role_id' => $roleId
+            ]);
             echo " [Role Assigned]";
         }
     }
