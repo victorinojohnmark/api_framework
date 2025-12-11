@@ -49,11 +49,14 @@ if ($config['env'] === 'development') {
     error_reporting(0);
 }
 
-# 5. INITIALIZE ROUTER
+# 5. Helper
+require_once ROOT_PATH . '/core/helpers.php';
+
+# 6. INITIALIZE ROUTER
 use Core\Router;
 $router = new Router();
 
-# 6. LOAD ROUTES
+# 7. LOAD ROUTES
 $routesPath = ROOT_PATH . '/routes/api.php';
 if (file_exists($routesPath)) {
     require_once $routesPath;
@@ -61,5 +64,5 @@ if (file_exists($routesPath)) {
     die("Error: Routes file not found at $routesPath");
 }
 
-# 7. DISPATCH REQUEST
+# 8. DISPATCH REQUEST
 $router->dispatch();

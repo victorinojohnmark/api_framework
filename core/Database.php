@@ -11,12 +11,12 @@ class Database
     // Builder Properties
     protected $table;
     protected $select = '*';
-    protected $joins = [];   // New: Store join clauses
+    protected $joins = [];
     protected $where = [];
     protected $params = [];
     protected $orderBy = '';
     protected $limit = '';
-    protected $offset = '';  // New: Store offset
+    protected $offset = '';
 
     public function __construct()
     {

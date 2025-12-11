@@ -12,6 +12,9 @@ return [
     'db_name' => getenv('DB_NAME') ?: 'test',
     'db_user' => getenv('DB_USER') ?: 'root',
     'db_pass' => getenv('DB_PASS') ?: '',
+
+    # JWT Settings
+    'jwt_secret' => getenv('JWT_SECRET') ?: 'default-secret',
     
     # Paths
     'root_path' => dirname(__DIR__),
