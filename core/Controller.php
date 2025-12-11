@@ -98,4 +98,24 @@ class Controller
 
         return true;
     }
+
+    /**
+     * Get the authenticated user data
+     * Returns an object: $this->user()->id, $this->user()->role
+     * @return object|null
+     */
+    protected function user()
+    {
+        // Check if AuthMiddleware has run
+        if (!isset($_REQUEST['auth_user_id'])) {
+            return null;
+        }
+
+        // Return an anonymous object for clean syntax
+        return (object) [
+            'id'   => $_REQUEST['auth_user_id'],
+            'role' => $_REQUEST['auth_user_role'] ?? 'user',
+            // You can add more fields here if your Middleware saves them
+        ];
+    }
 }
