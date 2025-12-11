@@ -20,7 +20,16 @@ class Database
 
     public function __construct()
     {
-        $config = defined('APP_CONFIG') ? APP_CONFIG : require __DIR__ . '/../config/config.php';
+        // Handle config location (support both root and /config folder)
+        if (defined('APP_CONFIG')) {
+            $config = APP_CONFIG;
+        } else {
+            $configPath = __DIR__ . '/../config/config.php';
+            if (!file_exists($configPath)) {
+                $configPath = __DIR__ . '/../config.php';
+            }
+            $config = require $configPath;
+        }
 
         try {
             $dsn = "mysql:host={$config['db_host']};dbname={$config['db_name']};charset=utf8mb4";
@@ -41,11 +50,6 @@ class Database
         return $this;
     }
 
-    /**
-     * Select Support
-     * Supports array: select(['id', 'name'])
-     * Supports string: select('users.id, users.first_name')
-     */
     public function select($columns = '*')
     {
         $this->select = is_array($columns) ? implode(', ', $columns) : $columns;
@@ -72,49 +76,33 @@ class Database
 
     // --- 3. WHERE METHODS ---
 
-    /**
-     * Supports:
-     * 1. where('age', '>', 18)
-     * 2. where('status', 'active')  -> defaults to '='
-     * 3. where('id = 1')            -> Raw string support
-     */
     public function where($column, $operator = null, $value = null)
     {
-        // Case A: Raw Where -> where("users.id = 1")
         if ($operator === null && $value === null) {
             $this->where[] = $column;
             return $this;
         }
 
-        // Case B: Short Syntax -> where('id', 5)
         if ($value === null) {
             $value = $operator;
             $operator = '=';
         }
 
-        // Case C: Standard -> where('age', '>', 18)
         $this->where[] = "$column $operator ?";
         $this->params[] = $value;
         return $this;
     }
 
-    /**
-     * Safe Raw WHERE clause with bindings
-     * Usage: whereRaw("age > ? OR role = ?", [18, 'admin'])
-     */
     public function whereRaw($sql, $params = [])
     {
         $this->where[] = $sql;
-        
-        // Merge new params with existing ones safely
         if (!empty($params)) {
             $this->params = array_merge($this->params, $params);
         }
-        
         return $this;
     }
 
-    // --- 4. ORDER & PAGINATION (Feature 3) ---
+    // --- 4. ORDER & PAGINATION ---
 
     public function orderBy($column, $direction = 'ASC')
     {
@@ -134,19 +122,7 @@ class Database
         return $this;
     }
 
-    // --- 5. EXECUTION & DEBUGGING ---
-
-    /**
-     * getQuery()
-     * Returns the compiled SQL and params without executing it.
-     */
-    public function getQuery()
-    {
-        return [
-            'sql'    => $this->compileSelect(),
-            'params' => $this->params
-        ];
-    }
+    // --- 5. EXECUTION (READ) ---
 
     public function get()
     {
@@ -160,62 +136,112 @@ class Database
         $stmt = $this->executeSelect();
         return $stmt->fetch();
     }
+    
+    public function getQuery()
+    {
+        return [
+            'sql'    => $this->compileSelect(),
+            'params' => $this->params
+        ];
+    }
 
-    // --- HELPER METHODS ---
+    // --- 6. EXECUTION (WRITE) ---
 
     /**
-     * Compiles the SELECT string
+     * Insert Data
+     * Returns: Last Insert ID
      */
-    private function compileSelect()
+    public function insert(array $data)
     {
-        $sql = "SELECT {$this->select} FROM {$this->table}";
+        $columns = implode(', ', array_keys($data));
+        $placeholders = implode(', ', array_fill(0, count($data), '?'));
 
-        // Add Joins
-        if (!empty($this->joins)) {
-            $sql .= " " . implode(' ', $this->joins);
+        $sql = "INSERT INTO {$this->table} ($columns) VALUES ($placeholders)";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(array_values($data));
+        
+        return $this->pdo->lastInsertId();
+    }
+
+    /**
+     * Update Data
+     * Returns: Boolean (Success/Fail)
+     */
+    public function update(array $data)
+    {
+        $set = [];
+        $values = [];
+
+        foreach ($data as $col => $val) {
+            $set[] = "$col = ?";
+            $values[] = $val;
         }
 
-        // Add Wheres
+        $sql = "UPDATE {$this->table} SET " . implode(', ', $set);
+        
+        // Add WHERE clause
+        if (!empty($this->where)) {
+            $sql .= " WHERE " . implode(' AND ', $this->where);
+            $values = array_merge($values, $this->params);
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute($values);
+    }
+
+    /**
+     * Delete Data
+     * Returns: Boolean (Success/Fail)
+     */
+    public function delete()
+    {
+        $sql = "DELETE FROM {$this->table}";
+
         if (!empty($this->where)) {
             $sql .= " WHERE " . implode(' AND ', $this->where);
         }
 
-        // Add Order, Limit, Offset
-        // Note: Space is important before appends
-        $sql .= " {$this->orderBy} {$this->limit} {$this->offset}";
-
-        return trim($sql); // Clean up extra spaces
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute($this->params);
     }
 
-    /**
-     * Execute a Raw SQL Query
-     * Supports placeholders for safety: query("SELECT * FROM users WHERE id = ?", [1])
-     * * @param string $sql
-     * @param array  $params
-     * @return array|bool Returns array of objects for SELECT, true/false for INSERT/UPDATE
-     */
+    // --- 7. RAW QUERY & HELPERS ---
+
     public function query($sql, $params = [])
     {
-        $this->reset(); // Clean up any previous builder state to avoid conflicts
-
+        $this->reset(); 
         try {
             $stmt = $this->pdo->prepare($sql);
             $success = $stmt->execute($params);
 
-            // If the query starts with SELECT, return the results
             if (stripos(trim($sql), 'SELECT') === 0) {
                 return $stmt->fetchAll();
             }
-
-            // For INSERT, UPDATE, DELETE, return boolean success
             return $success;
         } catch (PDOException $e) {
-            // In development, you might want to see the SQL error
             if (defined('APP_CONFIG') && APP_CONFIG['env'] === 'development') {
                 die("Raw Query Error: " . $e->getMessage());
             }
             return false;
         }
+    }
+
+    private function compileSelect()
+    {
+        $sql = "SELECT {$this->select} FROM {$this->table}";
+
+        if (!empty($this->joins)) {
+            $sql .= " " . implode(' ', $this->joins);
+        }
+
+        if (!empty($this->where)) {
+            $sql .= " WHERE " . implode(' AND ', $this->where);
+        }
+
+        $sql .= " {$this->orderBy} {$this->limit} {$this->offset}";
+
+        return trim($sql);
     }
 
     private function executeSelect()
