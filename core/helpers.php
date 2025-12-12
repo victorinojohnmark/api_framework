@@ -29,3 +29,33 @@ if (!function_exists('auth')) {
         return null;
     }
 }
+
+if (!function_exists('getallheaders')) {
+    /**
+     * Polyfill for getallheaders() if the server is missing it (e.g. Nginx/FPM)
+     * @return array
+     */
+    function getallheaders() {
+        $headers = [];
+
+        foreach ($_SERVER as $name => $value) {
+            // 1. Handle standard headers (HTTP_...)
+            if (substr($name, 0, 5) == 'HTTP_') {
+                // HTTP_USER_AGENT -> User-Agent
+                $headerName = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))));
+                $headers[$headerName] = $value;
+            }
+            
+            // 2. Handle special cases (Content-Type, Content-Length)
+            // These sometimes don't have the HTTP_ prefix in $_SERVER
+            elseif ($name == 'CONTENT_TYPE') {
+                $headers['Content-Type'] = $value;
+            }
+            elseif ($name == 'CONTENT_LENGTH') {
+                $headers['Content-Length'] = $value;
+            }
+        }
+        
+        return $headers;
+    }
+}
