@@ -8,39 +8,85 @@ A lightweight, self-contained, no-composer MVC framework designed for speed and 
 Ensure your project looks like this:
 
 ```text
-/project-root-folder
+/project-root
 ├── app/
-│   └── Controllers/       # Your Logic
+│   ├── Controllers/         # API Controllers (e.g. UserController.php)
+│   └── Middleware/          # Middleware Classes (e.g. AuthMiddleware.php)
+├── config/
+│   ├── config.php           # Main Configuration
+│   └── middleware.php       # Middleware Registry
 ├── core/
-│   ├── Controller.php     # Base Controller
-│   └── Router.php         # Routing Engine
+│   ├── Database/            # Schema Builder Classes
+│   │   ├── Blueprint.php
+│   │   └── Schema.php
+│   ├── Auth.php             # RBAC Authorization Class
+│   ├── Controller.php       # Base Controller
+│   ├── Database.php         # Query Builder Class
+│   ├── DotEnv.php           # .env File Parser
+│   ├── helpers.php          # Global Helper Functions
+│   ├── JWT.php              # JWT Token Encoder/Decoder
+│   ├── Middleware.php       # Middleware Interface
+│   └── Router.php           # Routing Engine
+├── database/
+│   ├── migrations/          # Migration Files
+│   ├── seeds/               # Seeder Files
+│   ├── create_migration.php # CLI: Generate Migrations
+│   ├── migrate.php          # CLI: Run Migrations
+│   ├── rollback.php         # CLI: Rollback Migrations
+│   └── seed.php             # CLI: Run Seeders
 ├── routes/
-│   └── api.php            # Route Definitions
-├── config.php             # Environment Config
-├── index.php              # Entry Point
-├── serve.php              # Local Development Server
-└── .htaccess              # Apache Config (Optional)
+│   └── api.php              # Route Definitions
+├── .env                     # Environment Variables (Do not commit)
+├── .env.example             # Example Environment Template
+├── index.php                # Entry Point
+├── serve.php                # Local Development Server
+└── .htaccess                # Apache Config (Optional)
 ```
 
-### 1.2 Configuration (`config.php`)
-Set your environment variables in the root `config.php` file.
+### 1.2 Configuration
 
+The application uses a **DotEnv** system. You should never edit `config/config.php` directly for credentials. Instead, use the `.env` file in the project root.
+
+**1.2.1 Setup Environment Variables**
+Copy the example file to create your local configuration.
+```bash
+cp .env.example .env
+```
+Open `.env` and update your settings:
+```TOML
+APP_NAME="My API Framework"
+APP_ENV=development
+BASE_URL=http://localhost:8000
+APP_TIMEZONE=Asia/Manila
+
+DB_HOST=localhost
+DB_NAME=my_database
+DB_USER=root
+DB_PASS=secret
+
+JWT_SECRET=ChangeThisToASuperSecretKey
+```
+**1.2.2 The Config Bridge (`config/config.php`)** This file acts as a bridge to load environment variables. It is located in `config/config.php`.
 ```php
 <?php
 return [
     # App Settings
-    'app_name' => 'Project Name',
-    'env'      => 'development', # 'development' or 'production'
-    'base_url' => 'http://localhost:8000',
+    'app_name' => getenv('APP_NAME') ?: 'Default App',
+    'env'      => getenv('APP_ENV') ?: 'production',
+    'base_url' => getenv('BASE_URL') ?: 'http://localhost',
+    'timezone' => getenv('APP_TIMEZONE') ?: 'UTC',
 
     # Database Settings
-    'db_host' => 'localhost',
-    'db_name' => 'database_name',
-    'db_user' => 'root',
-    'db_pass' => '',
+    'db_host' => getenv('DB_HOST') ?: '127.0.0.1',
+    'db_name' => getenv('DB_NAME') ?: 'test',
+    'db_user' => getenv('DB_USER') ?: 'root',
+    'db_pass' => getenv('DB_PASS') ?: '',
     
+    # Security
+    'jwt_secret' => getenv('JWT_SECRET') ?: 'default-secret',
+
     # Paths
-    'root_path' => __DIR__,
+    'root_path' => dirname(__DIR__), # Points to the project root
 ];
 ```
 
