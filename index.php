@@ -38,6 +38,9 @@ if (!file_exists($configFile)) {
 $config = require $configFile;
 define('APP_CONFIG', $config);
 
+# Set default timezone
+date_default_timezone_set($config['timezone']);
+
 # 4. ENVIRONMENT SETUP
 if ($config['env'] === 'development') {
     ini_set('display_errors', 1);

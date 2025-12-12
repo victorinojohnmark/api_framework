@@ -6,6 +6,7 @@ return [
     'app_name' => getenv('APP_NAME') ?: 'Project Name',
     'env'      => getenv('APP_ENV') ?: 'production',
     'base_url' => getenv('BASE_URL') ?: 'http://localhost',
+    'timezone' => getenv('APP_TIMEZONE') ?: 'UTC',
 
     # Database Settings
     'db_host' => getenv('DB_HOST') ?: '127.0.0.1',

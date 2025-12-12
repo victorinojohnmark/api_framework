@@ -36,6 +36,14 @@ class Database
             $this->pdo = new PDO($dsn, $config['db_user'], $config['db_pass']);
             $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
+
+            // --- SYNC TIMEZONE ---
+            // Get the current offset from PHP (e.g., "+08:00")
+            $now = new \DateTime('now', new \DateTimeZone($config['timezone']));
+            $offset = $now->format('P'); 
+
+            // Force MySQL to use this offset
+            $this->pdo->exec("SET time_zone = '$offset'");
         } catch (PDOException $e) {
             die("DB Connection Error: " . $e->getMessage());
         }
