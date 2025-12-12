@@ -41,6 +41,19 @@ define('APP_CONFIG', $config);
 # Set default timezone
 date_default_timezone_set($config['timezone']);
 
+# --- DYNAMIC CORS ---
+$allowedOrigin = $config['frontend_url'];
+
+header("Access-Control-Allow-Origin: $allowedOrigin");
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
 # 4. ENVIRONMENT SETUP
 if ($config['env'] === 'development') {
     ini_set('display_errors', 1);
