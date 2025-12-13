@@ -59,3 +59,27 @@ if (!function_exists('getallheaders')) {
         return $headers;
     }
 }
+
+if (!function_exists('asset')) {
+    /**
+     * Generate a full URL to a file based on the current request domain.
+     * * @param string $path Path to the file (e.g. 'uploads/avatar.jpg')
+     * @return string
+     */
+    function asset($path = '') {
+        // 1. Detect Protocol
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') 
+            ? "https" 
+            : "http";
+
+        // 2. Detect Host
+        // If accessed via api.myclient.com, this will be "api.myclient.com"
+        // If accessed via api.mysoftware.com, this will be "api.mysoftware.com"
+        $host = $_SERVER['HTTP_HOST'];
+
+        // 3. Clean Path
+        $cleanPath = ltrim($path, '/');
+
+        return "{$protocol}://{$host}/{$cleanPath}";
+    }
+}
