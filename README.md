@@ -53,27 +53,35 @@ Copy the example file to create your local configuration.
 cp .env.example .env
 ```
 Open `.env` and update your settings:
-```TOML
-APP_NAME="My API Framework"
+```ini
+APP_NAME="My Project Name"
 APP_ENV=development
 BASE_URL=http://localhost:8000
 APP_TIMEZONE=Asia/Manila
 
-DB_HOST=localhost
-DB_NAME=my_database
-DB_USER=root
-DB_PASS=secret
+# Server & CORS Settings
+APP_PORT=8000
+FRONTEND_URL=http://localhost:3000
 
-JWT_SECRET=ChangeThisToASuperSecretKey
+DB_HOST=localhost
+DB_NAME=projects
+DB_USER=root
+DB_PASS="P@ssw0rd#"
+
+JWT_SECRET=Sup3rS3cr3tK3y!
 ```
 **1.2.2 The Config Bridge (`config/config.php`)** This file acts as a bridge to load environment variables. It is located in `config/config.php`.
 ```php
 <?php
+// config/config.php
+
 return [
     # App Settings
-    'app_name' => getenv('APP_NAME') ?: 'Default App',
+    'app_name' => getenv('APP_NAME') ?: 'Project Name',
     'env'      => getenv('APP_ENV') ?: 'production',
     'base_url' => getenv('BASE_URL') ?: 'http://localhost',
+    'port'         => getenv('APP_PORT') ?: '8000',
+    'frontend_url' => getenv('FRONTEND_URL') ?: '*',
     'timezone' => getenv('APP_TIMEZONE') ?: 'UTC',
 
     # Database Settings
@@ -81,12 +89,12 @@ return [
     'db_name' => getenv('DB_NAME') ?: 'test',
     'db_user' => getenv('DB_USER') ?: 'root',
     'db_pass' => getenv('DB_PASS') ?: '',
-    
-    # Security
-    'jwt_secret' => getenv('JWT_SECRET') ?: 'default-secret',
 
+    # JWT Settings
+    'jwt_secret' => getenv('JWT_SECRET') ?: 'default-secret',
+    
     # Paths
-    'root_path' => dirname(__DIR__), # Points to the project root
+    'root_path' => dirname(__DIR__),
 ];
 ```
 
@@ -94,7 +102,7 @@ return [
 You don't need Apache for local work. Use the built-in command line tool:
 
 ```bash
-php -S localhost:8000 serve.php
+php serve.php
 ```
 
  Visit `http://localhost:8000/` to test.
@@ -516,7 +524,7 @@ The framework includes a native, composer-free JWT Helper.
 **Configuration**
 Add your secret key to your `.env` file.
 
-```TOML
+```ini
 JWT_SECRET=YourSuperSecretKeyHere
 ```
 
