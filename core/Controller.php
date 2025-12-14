@@ -76,6 +76,57 @@ class Controller
     }
 
     /**
+     * Get a normalized file or array of files from $_FILES
+     * * @param string|null $key The input name (e.g. 'avatar')
+     * @return array|null
+     */
+    public function file($key = null)
+    {
+        // 1. If requesting a specific key
+        if ($key) {
+            if (!isset($_FILES[$key])) {
+                return null;
+            }
+            // Normalize just this file entry
+            return $this->normalizeFiles($_FILES[$key]);
+        }
+
+        // 2. Return all files normalized
+        $normalized = [];
+        foreach ($_FILES as $k => $v) {
+            $normalized[$k] = $this->normalizeFiles($v);
+        }
+        return $normalized;
+    }
+
+    /**
+     * Recursive helper to normalize PHP's $_FILES structure
+     * Converts: ['name'=>[0=>'a.png'], 'type'=>[0=>'img']] 
+     * To:       [0=>['name'=>'a.png', 'type'=>'img']]
+     */
+    private function normalizeFiles($file)
+    {
+        // If 'name' is an array, it's a multiple upload or nested structure
+        if (is_array($file['name'])) {
+            $files = [];
+            foreach ($file['name'] as $k => $v) {
+                // Recursively build the structure
+                $files[$k] = $this->normalizeFiles([
+                    'name'     => $file['name'][$k],
+                    'type'     => $file['type'][$k],
+                    'tmp_name' => $file['tmp_name'][$k],
+                    'error'    => $file['error'][$k],
+                    'size'     => $file['size'][$k],
+                ]);
+            }
+            return $files;
+        }
+
+        // Base case: It's a single file
+        return $file;
+    }
+
+    /**
      * Basic Validation Helper
      * Checks if required keys exist in input
      * * @param array $requiredKeys List of keys that must be present
@@ -118,4 +169,5 @@ class Controller
             // You can add more fields here if your Middleware saves them
         ];
     }
+
 }
