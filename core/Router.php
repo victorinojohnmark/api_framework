@@ -9,14 +9,15 @@ class Router
     protected $groupPrefix = '';
     protected $groupMiddleware = [];
 
+    // Track the last added route index to allow modification
+    protected $lastRouteIndex = null;
+
     /**
      * Define a Route Group
-     * @param array    $attributes  ['prefix' => '/admin', 'middleware' => ['auth']]
-     * @param callable $callback    Function to register routes
      */
     public function group(array $attributes, callable $callback)
     {
-        // 1. BACKUP Previous State (To support nested groups)
+        // 1. BACKUP Previous State
         $previousPrefix = $this->groupPrefix;
         $previousMiddleware = $this->groupMiddleware;
 
@@ -26,56 +27,86 @@ class Router
         }
         
         if (isset($attributes['middleware'])) {
-            // Ensure middleware is always an array
             $newMiddleware = (array) $attributes['middleware'];
             $this->groupMiddleware = array_merge($this->groupMiddleware, $newMiddleware);
         }
 
-        // 3. EXECUTE Callback (The routes inside the closure are registered now)
-        // We pass $this (the router) to the closure
+        // 3. EXECUTE Callback
         call_user_func($callback, $this);
 
-        // 4. RESTORE Previous State (Pop stack)
+        // 4. RESTORE Previous State
         $this->groupPrefix = $previousPrefix;
         $this->groupMiddleware = $previousMiddleware;
     }
 
-    public function get($route, $action, $middleware = []) { $this->add('GET', $route, $action, $middleware); }
-    public function post($route, $action, $middleware = []) { $this->add('POST', $route, $action, $middleware); }
-    public function put($route, $action, $middleware = []) { $this->add('PUT', $route, $action, $middleware); }
-    public function delete($route, $action, $middleware = []) { $this->add('DELETE', $route, $action, $middleware); }
+    // All methods now return $this to allow chaining
+    public function get($route, $action, $middleware = []) { return $this->add('GET', $route, $action, $middleware); }
+    public function post($route, $action, $middleware = []) { return $this->add('POST', $route, $action, $middleware); }
+    public function put($route, $action, $middleware = []) { return $this->add('PUT', $route, $action, $middleware); }
+    public function delete($route, $action, $middleware = []) { return $this->add('DELETE', $route, $action, $middleware); }
+
+    /**
+     * Exclude specific middleware from the last added route
+     * @param array|string $names Middleware keys to remove
+     * @return $this
+     */
+    public function excludeMiddleware($names)
+    {
+        // Safety check: ensure a route was actually added before calling this
+        if ($this->lastRouteIndex === null || !isset($this->routes[$this->lastRouteIndex])) {
+            return $this;
+        }
+
+        $names = (array) $names; // Ensure input is an array
+        
+        // Get current middleware of the last added route
+        $current = $this->routes[$this->lastRouteIndex]['middleware'];
+
+        // Remove the specified middleware
+        // array_diff returns entries from $current that are NOT in $names
+        $filtered = array_diff($current, $names);
+
+        // Re-assign (array_values ensures keys are re-indexed cleanly)
+        $this->routes[$this->lastRouteIndex]['middleware'] = array_values($filtered);
+
+        return $this;
+    }
 
     /**
      * Internal method to store the route
+     * Returns $this
      */
     private function add($method, $route, $action, $middleware = [])
     {
         // 1. MERGE Group Prefix
-        // If inside a group, prepend the prefix
         $finalRoute = $this->groupPrefix . $route;
         
-        // Ensure no double slashes (//) unless it's root
         if ($finalRoute !== '/') {
             $finalRoute = rtrim($finalRoute, '/');
         }
 
         // 2. MERGE Group Middleware
-        // Merge group middleware with route-specific middleware
         $finalMiddleware = array_merge($this->groupMiddleware, (array)$middleware);
 
         // 3. Regex Conversion
         $pattern = preg_replace('/\{([a-zA-Z0-9-_]+)\}/', '([a-zA-Z0-9-_]+)', $finalRoute);
         $pattern = '#^' . $pattern . '$#';
 
+        // 4. Store Route
         $this->routes[] = [
             'method'     => $method,
             'pattern'    => $pattern,
             'action'     => $action,
             'middleware' => $finalMiddleware
         ];
+
+        // Save the index of this new route so excludeMiddleware can find it
+        $this->lastRouteIndex = count($this->routes) - 1;
+
+        return $this;
     }
 
-    // ... (Keep your dispatch() and sendError() methods exactly as they were) ...
+    // -- dispatch method --
     public function dispatch()
     {
         $requestMethod = $_SERVER['REQUEST_METHOD'];
@@ -93,7 +124,6 @@ class Router
 
                 // Check Middleware
                 if (!empty($route['middleware'])) {
-                    // Adjust this path if needed
                     $configFile = defined('ROOT_PATH') ? ROOT_PATH . '/config/middleware.php' : __DIR__ . '/../config/middleware.php';
                     
                     if (file_exists($configFile)) {
