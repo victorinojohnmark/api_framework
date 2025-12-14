@@ -276,6 +276,20 @@ The `Core\Controller` provides these built-in methods:
 
   * Retrieves data from JSON body, `$_POST`, or `$_GET`.
 
+### 3.5 File Uploads
+Access `$_FILES` using the `$this->file()` method. It automatically reorganizes multiple uploads into a clean array.
+```php
+// Get a single file
+$avatar = $this->file('avatar'); 
+// ['name' => 'me.jpg', 'tmp_name' => '...', 'size' => 1024]
+
+// Get multiple files (e.g. <input name="photos[]">)
+$photos = $this->file('photos');
+// [
+//    0 => ['name' => '1.jpg', ...],
+//    1 => ['name' => '2.jpg', ...]
+// ]
+```
 
 ---
 
