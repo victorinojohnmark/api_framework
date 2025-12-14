@@ -110,7 +110,7 @@ php serve.php
  ---
 
 ## 2. Routing
-Define all API endpoints in `routes/api.php`. The framework supports standard HTTP verbs and dynamic parameters.
+Define all API endpoints in `routes/api.php`. The framework supports standard HTTP verbs, dynamic parameters, groups, and middleware filtering.
 
 ### 2.1 Basic Routes
 ```php
@@ -121,18 +121,48 @@ $router->get('/health', 'SystemController@status');
 
 // POST Request
 $router->post('/auth/login', 'AuthController@login');
-
 ```
 
 ### 2.2 Dynamic Parameters
-You can capture segments of the URL using `{curly_braces}`.
+You can capture segments of the URL using `{curly_braces}`. These are passed as arguments to your controller method.
 ```php
-// Capture a single ID
+// Capture a single ID -> show($id)
 $router->get('/users/{id}', 'UserController@show');
 
-// Capture multiple parameters
+// Capture multiple parameters -> show($project_id, $task_id)
 // URL Example: /projects/10/tasks/55
 $router->get('/projects/{project_id}/tasks/{task_id}', 'TaskController@show');
+```
+
+### 2.3 Route Groups & Middleware
+You can group routes to apply a common URL prefix or middleware.
+```php
+// Group routes under '/admin' with 'auth' middleware
+$router->group(['prefix' => '/admin', 'middleware' => ['auth']], function($router) {
+    
+    // Final URL: /admin/dashboard
+    // Middleware: ['auth']
+    $router->get('/dashboard', 'AdminController@dashboard');
+
+    // Final URL: /admin/settings
+    $router->get('/settings', 'AdminController@settings');
+    
+});
+```
+
+### 2.4 Excluding Middleware
+If you apply middleware to a group but need to make a specific route public, you can chain `excludeMiddleware`.
+```php
+$router->group(['prefix' => '/api', 'middleware' => ['auth']], function($router) {
+
+    // Protected Route
+    $router->get('/profile', 'UserController@profile');
+
+    // Public Route (Auth middleware removed for this specific route)
+    $router->get('/public-info', 'UserController@info')
+           ->excludeMiddleware(['auth']); 
+
+});
 ```
 
 ---
@@ -142,8 +172,7 @@ Controllers handle the incoming request and return a JSON response. All controll
 
 #### Location: `app/Controllers/`
 
-### 3.1 Example Controller
-
+### 3.1 Basic Example
 ```php
 <?php
 namespace App\Controllers;
@@ -154,32 +183,28 @@ class UserController extends Controller
 {
     /**
      * GET /users
+     * Access the Database directly
      */
     public function index()
     {
-        $data = [
-            ['id' => 1, 'name' => 'John Doe'],
-            ['id' => 2, 'name' => 'Jane Smith']
-        ];
+        // $this->db is automatically available
+        $users = $this->db->table('users')->select('id', 'name', 'email')->get();
 
-        return $this->json($data);
+        return $this->json($users);
     }
 
     /**
      * GET /users/{user_id}
-     * The $useId argument matches the route parameter {user_id}
      */
     public function show($userId)
     {
-        // Mock data logic
-        if ($userId == 999) {
+        $user = $this->db->table('users')->where('id', $userId)->first();
+
+        if (!$user) {
             return $this->error('User not found', 404);
         }
 
-        return $this->json([
-            'id' => $userId,
-            'name' => 'User ' . $userId
-        ]);
+        return $this->json($user);
     }
 
     /**
@@ -187,39 +212,70 @@ class UserController extends Controller
      */
     public function store()
     {
-        // helper to get JSON body or POST data
         $name = $this->input('name');
         $email = $this->input('email');
 
-        // Simple validation
         if (!$name || !$email) {
             return $this->error('Name and Email are required', 400);
         }
 
-        return $this->json([
-            'status' => 'success',
-            'message' => 'User created'
-        ], 201);
+        $this->db->table('users')->insert([
+            'name' => $name, 
+            'email' => $email
+        ]);
+
+        return $this->json(['message' => 'User created'], 201);
     }
 }
 ```
 
-### 3.2 Helper Methods
+### 3.2 Accessing the Authenticated User
+If a route is protected by `AuthMiddleware`, the current user's ID is injected into the request.
+```php
+public function profile()
+{
+    // 'auth_user_id' is set by the Middleware
+    $currentUserId = $_REQUEST['auth_user_id'] ?? null;
+
+    $user = $this->db->table('users')->where('id', $currentUserId)->first();
+    
+    return $this->json($user);
+}
+```
+
+### 3.3 Dynamic URLs & Files
+Use the `asset()` helper to generate correct URLs (handles HTTP/HTTPS and Custom Domains automatically).
+```php
+public function avatar()
+{
+    $filename = 'avatar-123.jpg';
+    
+    // Returns: [https://api.yoursite.com/storage/avatar-123.jpg](https://api.yoursite.com/storage/avatar-123.jpg)
+    $url = asset('storage/' . $filename); 
+
+    return $this->json(['url' => $url]);
+}
+```
+
+### 3.4 Helper Methods
 The `Core\Controller` provides these built-in methods:
+
+* `$this->db`
+
+  * The fluent Query Builder instance (e.g., `$this->db->table('...')`).
 
 * `$this->json($data, $status = 200)`
 
-  * Sends a standard JSON response and terminates the script.
+  * Sends a standard JSON response and exits.
 
-* `$this->error($message, $status = 400)`
+* $this->error($message, $status = 400)
 
-  * Sends a structured error response (e.g., {"status": "error", "message": "..."}).
+  * Sends a structured error response `{"status": "error", "message": "..."}`.
 
 * `$this->input($key = null, $default = null)`
 
   * Retrieves data from JSON body, `$_POST`, or `$_GET`.
 
-  * Example: `$this->input('email')`.
 
 ---
 
