@@ -276,19 +276,49 @@ The `Core\Controller` provides these built-in methods:
 
   * Retrieves data from JSON body, `$_POST`, or `$_GET`.
 
-### 3.5 File Uploads
-Access `$_FILES` using the `$this->file()` method. It automatically reorganizes multiple uploads into a clean array.
-```php
-// Get a single file
-$avatar = $this->file('avatar'); 
-// ['name' => 'me.jpg', 'tmp_name' => '...', 'size' => 1024]
+### 3.5 File Handling
+The controller provides a `file()` method that fixes the confusing PHP `$_FILES` structure. It recursively normalizes deep arrays, making iteration simple.
 
-// Get multiple files (e.g. <input name="photos[]">)
+**.5.1 Single File:**
+```php
+$avatar = $this->file('avatar');
+// Returns: ['name' => 'face.jpg', 'tmp_name' => '...', 'size' => 1024]
+```
+
+**3.5.2 Multiple Files (Arrays):**
+```php
+// HTML: <input type="file" name="photos[]" multiple>
 $photos = $this->file('photos');
+
+// Returns:
 // [
 //    0 => ['name' => '1.jpg', ...],
 //    1 => ['name' => '2.jpg', ...]
 // ]
+```
+
+**3.5.3 Complex / Nested Structures:** The normalizer handles multi-dimensional arrays automatically.
+
+**HTML Input:**
+```html
+<input type="file" name="user[profile][avatar]">
+<input type="file" name="user[docs][id_card]">
+```
+
+**Controller Usage:**
+```php
+public function update()
+{
+    $files = $this->file('user');
+
+    // Access nested data easily
+    $avatar = $files['profile']['avatar'];
+    $idCard = $files['docs']['id_card'];
+
+    if ($avatar['error'] === UPLOAD_ERR_OK) {
+        move_uploaded_file($avatar['tmp_name'], 'storage/' . $avatar['name']);
+    }
+}
 ```
 
 ---
