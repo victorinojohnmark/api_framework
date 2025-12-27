@@ -22,7 +22,7 @@ $envFile = ROOT_PATH . '/.env';
 if (!file_exists($envFile)) {
     # Stop the application immediately if .env is missing
     header("HTTP/1.1 500 Internal Server Error");
-    die("Error: config.php not found."); # Stop execution
+    die("Error: .env file not found.");
 }
 
 # Load the environment variables
@@ -65,14 +65,25 @@ if ($config['env'] === 'development') {
     error_reporting(0);
 }
 
-# 5. Helper
+# 5. HELPER
 require_once ROOT_PATH . '/core/helpers.php';
 
-# 6. INITIALIZE ROUTER
+# 6. INITIALIZE CORE SERVICES
+use Core\Database;
+use Core\Validator;
 use Core\Router;
+
+// Initialize Database connection once
+$db = new Database();
+
+// Boot Validator with the global DB instance
+// This enables 'unique' and 'exists' rules globally without manual injection
+Validator::boot($db);
+
+# 7. INITIALIZE ROUTER
 $router = new Router();
 
-# 7. LOAD ROUTES
+# 8. LOAD ROUTES
 $routesPath = ROOT_PATH . '/routes/api.php';
 if (file_exists($routesPath)) {
     require_once $routesPath;
@@ -80,5 +91,5 @@ if (file_exists($routesPath)) {
     die("Error: Routes file not found at $routesPath");
 }
 
-# 8. DISPATCH REQUEST
+# 9. DISPATCH REQUEST
 $router->dispatch();

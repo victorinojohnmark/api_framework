@@ -18,9 +18,13 @@ class Controller
         }
     }
 
+    // -------------------------------------------------------------------------
+    // RESPONSE HELPERS
+    // -------------------------------------------------------------------------
+
     /**
-     * Send a formatted JSON response
-     * * @param mixed $data    The data to send
+     * Send a formatted JSON response and exit
+     * @param mixed $data    The data to send
      * @param int   $status  HTTP Status Code (200, 201, 400, etc.)
      */
     protected function json($data, $status = 200)
@@ -32,32 +36,38 @@ class Controller
     }
 
     /**
-     * Send an Error response (Shortcut)
+     * Send an Error response
+     * Unified method to handle simple messages or validation arrays.
+     * * @param string $message The error message
+     * @param int    $status  HTTP Status Code (default 400)
+     * @param array  $errors  Optional array of validation errors or details
      */
-    protected function error($message, $status = 400, $details = [])
+    protected function error($message, $status = 400, $errors = [])
     {
         $response = [
             'status' => 'error',
             'message' => $message
         ];
 
-        if (!empty($details)) {
-            $response['details'] = $details;
+        // If extra error details provided (like validation fields), add them
+        if (!empty($errors)) {
+            $response['errors'] = $errors;
         }
 
         $this->json($response, $status);
     }
 
+    // -------------------------------------------------------------------------
+    // INPUT HELPERS
+    // -------------------------------------------------------------------------
+
     /**
      * Get Input Data (Unified)
      * Handles JSON Body, Form Data ($_POST), and Query Params ($_GET)
-     * * @param string|null $key      Specific key to retrieve (optional)
-     * @param mixed       $default  Default value if key is missing
-     * @return mixed
      */
     protected function input($key = null, $default = null)
     {
-        # 1. Read Raw JSON Body (for React/Vue/Mobile apps)
+        # 1. Read Raw JSON Body
         $json = json_decode(file_get_contents('php://input'), true);
         if (!$json) {
             $json = [];
@@ -77,21 +87,16 @@ class Controller
 
     /**
      * Get a normalized file or array of files from $_FILES
-     * * @param string|null $key The input name (e.g. 'avatar')
-     * @return array|null
      */
     public function file($key = null)
     {
-        // 1. If requesting a specific key
         if ($key) {
             if (!isset($_FILES[$key])) {
                 return null;
             }
-            // Normalize just this file entry
             return $this->normalizeFiles($_FILES[$key]);
         }
 
-        // 2. Return all files normalized
         $normalized = [];
         foreach ($_FILES as $k => $v) {
             $normalized[$k] = $this->normalizeFiles($v);
@@ -101,16 +106,12 @@ class Controller
 
     /**
      * Recursive helper to normalize PHP's $_FILES structure
-     * Converts: ['name'=>[0=>'a.png'], 'type'=>[0=>'img']] 
-     * To:       [0=>['name'=>'a.png', 'type'=>'img']]
      */
     private function normalizeFiles($file)
     {
-        // If 'name' is an array, it's a multiple upload or nested structure
         if (is_array($file['name'])) {
             $files = [];
             foreach ($file['name'] as $k => $v) {
-                // Recursively build the structure
                 $files[$k] = $this->normalizeFiles([
                     'name'     => $file['name'][$k],
                     'type'     => $file['type'][$k],
@@ -121,53 +122,63 @@ class Controller
             }
             return $files;
         }
-
-        // Base case: It's a single file
         return $file;
     }
 
-    /**
-     * Basic Validation Helper
-     * Checks if required keys exist in input
-     * * @param array $requiredKeys List of keys that must be present
-     * @return bool|array Returns true if valid, or array of missing keys
-     */
-    protected function validate($requiredKeys)
-    {
-        $input = $this->input();
-        $missing = [];
-
-        foreach ($requiredKeys as $key) {
-            if (empty($input[$key])) {
-                $missing[] = $key;
-            }
-        }
-
-        if (!empty($missing)) {
-            $this->error("Missing required fields: " . implode(', ', $missing), 400);
-        }
-
-        return true;
-    }
+    // -------------------------------------------------------------------------
+    // AUTH & VALIDATION HELPERS
+    // -------------------------------------------------------------------------
 
     /**
      * Get the authenticated user data
-     * Returns an object: $this->user()->id, $this->user()->role
-     * @return object|null
      */
     protected function user()
     {
-        // Check if AuthMiddleware has run
         if (!isset($_REQUEST['auth_user_id'])) {
             return null;
         }
 
-        // Return an anonymous object for clean syntax
         return (object) [
             'id'   => $_REQUEST['auth_user_id'],
             'role' => $_REQUEST['auth_user_role'] ?? 'user',
-            // You can add more fields here if your Middleware saves them
         ];
     }
 
+    /**
+     * Get a fresh Validator instance
+     */
+    public function getValidator()
+    {
+        return new Validator($this->db);
+    }
+
+    /**
+     * Helper: Validate and Stop on Error
+     * Validates data and automatically sends a 422 JSON response if it fails.
+     * * @param array $data  Input data
+     * @param array $rules Rule definitions
+     * @return array       Returns original data if valid
+     */
+    public function validate($data, $rules)
+    {
+        $v = $this->getValidator();
+
+        foreach ($rules as $field => $fieldRules) {
+            // Support pipe syntax "required|email"
+            if (is_string($fieldRules)) {
+                $fieldRules = explode('|', $fieldRules);
+            }
+            
+            // Run the check using your custom Validator class
+            $v->check($data[$field] ?? null, $field, $fieldRules);
+        }
+
+        // Check if global pass status is false
+        if (!$v->passed()) {
+            // Stops execution here and returns JSON
+            $this->error('Validation failed', 422, $v->errors);
+        }
+
+        return $data; 
+    }
 }
