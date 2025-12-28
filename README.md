@@ -323,14 +323,136 @@ public function update()
 
 ---
 
-## 4. Database & Query Builder
+## 4. Validation
+The framework includes a powerful `Core\Validator` class that handles standard rules, database checks (unique/exists), and deeply nested arrays.
+
+### Instantiation Methods
+There are two ways to use the validator depending on your needs.
+
+#### Method A: The Controller Helper (Recommended)
+Use `$this->validate()`. It automatically halts execution and returns a JSON `422 Unprocessable Entity` response if validation fails.
+
+```php
+public function store() 
+{
+    $input = $this->input();
+
+    // Stops here if failed
+    $this->validate($input, [
+        'email'    => 'required|email|unique:users,email',
+        'password' => 'required|min:8',
+        'role_id'  => 'required|exists:roles,id'
+    ]);
+
+    // Code here only runs if validation passed
+    $this->db->table('users')->insert($input);
+}
+```
+
+#### Method B: Manual Instantiation (For Complex Logic)
+Use new `Core\Validator()` manually. This is useful when you need to validate arrays in a loop or handle errors customly. You do not need to pass the DB connection; it is auto-injected.
+
+```php
+use Core\Validator;
+
+public function store()
+{
+    $validator = new Validator();
+
+    // Check individual fields
+    $validator->check($_POST['email'], 'email', ['required']);
+
+    if (!$validator->passed()) {
+        return $this->error('Custom error message', 400, $v->errors());
+    }
+}
+```
+
+### Validating Nested Arrays
+Since the validator avoids complex "dot notation" magic, you have full control to validate multi-layer arrays using standard loops.
+
+**Scenario:** Validating a list of order items.
+
+```php
+public function createOrder()
+{
+    $input = $this->input();
+    $validator = new Validator();
+
+    // 1. Validate Parent
+    $validator->check($input['client_id'], 'client_id', ['required', 'exists:clients,id']);
+    $validator->check($input['items'], 'items', ['required', 'array']);
+
+    // 2. Iterate Children
+    if (!empty($input['items'])) {
+        foreach ($input['items'] as $index => $item) {
+            
+            // Validate Product ID
+            $validator->check(
+                $item['product_id'] ?? null, 
+                "items.$index.product_id", // Error key: items.0.product_id
+                ['required', 'exists:products,id']
+            );
+
+            // Validate Quantity
+            $validator->check(
+                $item['quantity'] ?? null, 
+                "items.$index.quantity", 
+                ['required', 'numeric', 'min:1']
+            );
+        }
+    }
+
+    if (!$validator->passed()) {
+        return $this->error('Validation failed', 422, $v->errors());
+    }
+
+    // Save to DB...
+}
+```
+
+### Available Rules
+
+| Category | Rule | Example | Description |
+| :--- | :--- | :--- | :--- |
+| **Basic** | `required` | `required` | Field must not be empty. |
+| | `nullable` | `nullable` | Allows the field to be null/empty; skips subsequent rules if empty. |
+| | `bail` | `bail` | Stop validating this field after the first failure. |
+| **Type** | `email` | `email` | Must be a valid email address. |
+| | `numeric` | `numeric` | Must be a number. |
+| | `integer` | `integer` | Must be a whole integer. |
+| | `string` | `string` | Must be a string. |
+| | `boolean` | `boolean` | Must be true, false, 1, 0, "1", or "0". |
+| | `array` | `array` | Must be an array. |
+| **Size/Value** | `min` | `min:8` | Minimum string length, numeric value, or array count. |
+| | `max` | `max:50` | Maximum string length, numeric value, or array count. |
+| | `greater_than` | `greater_than:10` | Value must be strictly greater than X. |
+| | `less_than` | `less_than:100` | Value must be strictly less than X. |
+| **Database** | `unique` | `unique:users,email` | Fails if value already exists in the table column. |
+| | `unique` (Update)| `unique:users,email,5` | Same as unique, but ignores row with ID 5. |
+| | `exists` | `exists:roles,id` | Fails if value does NOT exist in the table column. |
+| **Comparison** | `same` | `same:password` | Value must match another request field. |
+| | `different` | `different:old_pass` | Value must differ from another request field. |
+| | `in` | `in:admin,editor` | Must be one of the listed values. |
+| | `not_in` | `not_in:banned` | Must not be one of the listed values. |
+| **Date/Time** | `date` | `date` or `date:Y-m-d` | Must be a valid date string. |
+| | `time` | `time` or `time:H:i` | Must be a valid time string. |
+| | `date_time` | `date_time:Y-m-d H:i:s` | Must be a valid date-time matching the format. |
+| **Files** | `file` | `file:jpg,png,pdf` | Validate file upload extension. |
+| | `mimes` | `mimes:image/jpeg` | Validate file MIME type (more secure). |
+| | `file_size` | `file_size:2048` | Max file size in Kilobytes (KB). |
+| **Advanced** | `regex` | `regex:/^[A-Z]+$/` | Must match the regular expression pattern. |
+
+---
+
+## 5. Database & Query Builder
 
 The framework includes a powerful, chainable Query Builder. It returns results as standard PHP Objects (`stdClass`), allowing clean arrow syntax (e.g., `$user->email`).
 
-### 4.1 Accessing the Database
+### Accessing the Database
 In any Controller, use `$this->db` to start a query.
 
-### 4.2 Basic Queries (SELECT)
+### Basic Queries (SELECT)
 
 **Get all rows:**
 
@@ -355,8 +477,8 @@ $this->db->table('users')->select(['id', 'email'])->get();
 $this->db->table('users')->select('users.id, projects.name')->get();
 ```
 
-### 4.3 Filtering (WHERE)
-#### 4.3.1 Standard Where:
+### Filtering (WHERE)
+#### Standard Where:
 
 ```php
 $this->db->table('products')
@@ -365,12 +487,12 @@ $this->db->table('products')
     ->get();
 ```
 
-#### 4.3.2 Raw Where String: Useful for hardcoded checks or complex logic.
+#### Raw Where String: Useful for hardcoded checks or complex logic.
 ```php
 $this->db->table('users')->where("id > 50 AND role = 'admin'")->get();
 ```
 
-#### 4.3.3 Complex Filtering (whereRaw)
+#### Complex Filtering (whereRaw)
 Use this when you need complex SQL logic (like brackets or OR conditions) mixed with variables. 
 **Always use `?` for variables.**
 
@@ -383,8 +505,8 @@ $this->db->table('users')
     ->get();
 ```
 
-### 4.4 Joins
-#### 4.4.1 Support for `join`, `leftJoin`, and `rightJoin`
+### Joins
+#### Support for `join`, `leftJoin`, and `rightJoin`
 ```php
 $data = $this->db->table('projects')
     ->select('projects.title, users.email')
@@ -392,7 +514,7 @@ $data = $this->db->table('projects')
     ->get();
 ```
 
-### 4.5 Pagination and Sorting
+### Pagination and Sorting
 ```php
 $users = $this->db->table('users')
     ->orderBy('created_at', 'DESC')
@@ -401,8 +523,8 @@ $users = $this->db->table('users')
     ->get();
 ```
 
-### 4.6 Write Operations
-**4.6.1 Insert:** Returns the last inserted ID.
+### Write Operations
+**Insert:** Returns the last inserted ID.
 ```php
 $newId = $this->db->table('users')->insert([
     'name' => 'John Doe',
@@ -410,26 +532,26 @@ $newId = $this->db->table('users')->insert([
 ]);
 ```
 
-**4.6.2 Update:** Returns `true` on success
+**Update:** Returns `true` on success
 ```php
 $this->db->table('users')
     ->where('id', 5)
     ->update(['status' => 'inactive']);
 ```
 
-**4.6.3 Delete:**
+**Delete:**
 ```php
 $this->db->table('users')->where('id', 5)->delete();
 ```
 
-### 4.7 Advanced Features
-**4.7.1 Raw SQL Queries:** For complex reports or optimization. Always use ? placeholders for safety.
+### Advanced Features
+**Raw SQL Queries:** For complex reports or optimization. Always use ? placeholders for safety.
 ```php
 $sql = "SELECT count(*) as total FROM users WHERE created_at > ?";
 $result = $this->db->query($sql, ['2023-01-01']);
 ```
 
-**4.7.2 Debugging (`getQuery`):** See the generated SQL without running it.
+**Debugging (`getQuery`):** See the generated SQL without running it.
 ```php
 $debug = $this->db->table('users')
     ->where('id', 1)
@@ -439,7 +561,7 @@ $debug = $this->db->table('users')
 ```
 ---
 
-## 5. Database Migrations
+## 6. Database Migrations
 
 The framework includes a powerful Schema Builder and command-line tools for managing database structure, inspired by Laravel.
 
@@ -450,7 +572,7 @@ Migration tools are located in the `database/` folder:
 * `database/migrate.php` - Runs pending migrations (UP).
 * `database/rollback.php` - Reverts the last migration (DOWN).
 
-### 5.1 Creating a Migration
+### Creating a Migration
 Use the generator script to create a timestamped file.
 
 ```bash
@@ -459,7 +581,7 @@ php database/create_migration.php CreateUsersTable
 
 This generates a file in `database/migrations/` pre-filled with the Schema Builder template and default utility columns (`active`, `timestamps`, `softDelete`).
 
-### 5.2 Editing the Migration
+### Editing the Migration
 The framework uses a fluent `Schema` and `Blueprint` system, so you don't have to write raw SQL.
 
 **Creating a Table:**
@@ -520,13 +642,13 @@ public function down()
 }
 ```
 
-### 5.3 Running Migrations
+### Running Migrations
 Execute all pending migrations:
 ```bash
 php database/migrate.php
 ```
 
-### 5.4 Rolling Back
+### Rolling Back
 Undo the last batch of migrations (executes the `down()` method):
 ```bash
 php database/rollback.php
@@ -534,11 +656,11 @@ php database/rollback.php
 
 ---
 
-## 6. Middleware
+## 7. Middleware
 
 Middleware allows you to intercept requests before they reach your controller. This is essential for Authentication, Rate Limiting, and Access Control.
 
-### 6.1 Creating Middleware
+### Creating Middleware
 Middleware classes must implement the `Core\Middleware` interface and define a `handle()` method.
 
 **Location:** `app/Middleware/`
@@ -585,7 +707,7 @@ class AuthMiddleware implements Middleware
 }
 ```
 
-### 6.2 Registering Middleware
+### Registering Middleware
 Map your middleware classes to short aliases in the configuration file.
 **File:** `config/middleware.php`
 
@@ -596,7 +718,7 @@ return [
 ];
 ```
 
-### 6.3 Applying Middleware
+### Applying Middleware
 **Single Route:** Pass the alias as the third argument.
 
 ```php
@@ -618,7 +740,7 @@ $router->group(['prefix' => '/api/v1', 'middleware' => ['auth']], function($rout
 
 ---
 
-## 7. Authentication (JWT)
+## 8. Authentication (JWT)
 The framework includes a native, composer-free JWT Helper.
 
 **Configuration**
@@ -651,7 +773,7 @@ public function login()
 
 ---
 
-## 8. Authorization & RBAC
+## 9. Authorization & RBAC
 
 The framework implements a robust Role-Based Access Control (RBAC) system. It uses specific database tables (`users`, `roles`, `permissions`) to manage access dynamically.
 
@@ -664,7 +786,7 @@ php database/create_migration.php CreateUsersTable
 php database/create_migration.php CreateRbacTables
 ```
 
-### 8.2 Paste Schema:
+### Paste Schema:
 **File:** `database/migrations/xxxx_CreateUsersTable.php`
 ```php
 <?php
@@ -746,7 +868,7 @@ class CreateRbacTables
 
 ```
 
-### 8.3 Run Migrations:
+### Run Migrations:
 ```bash
 php database/migrate.php
 ```
@@ -801,14 +923,14 @@ public function destroy($id)
 
 ---
 
-## 9. Database Seeding
+## 10. Database Seeding
 
 Seeders allow you to populate your database with initial data (like Admin accounts or default settings).
 
-### 9.1 Seeder Engine
+### Seeder Engine
 The framework includes a seeder runner located at `database/seed.php`.
 
-### 9.2 Creating a Seeder
+### Creating a Seeder
 Create a class file in `database/seeds/`. The class name must match the filename.
 
 **File:** `database/seeds/AdminSeeder.php`
@@ -884,7 +1006,7 @@ class AdminSeeder
 }
 ```
 
-### 9.3 Running Seeders
+### Running Seeders
 Run all seeders in the folder:
 ```bash
 php database/seed.php
