@@ -35,6 +35,9 @@ class Blueprint
     public function integer($name) { return $this->addColumn("`$name` INT"); }
     public function string($name, $len = 255) { return $this->addColumn("`$name` VARCHAR($len)"); }
     public function text($name) { return $this->addColumn("`$name` TEXT"); }
+    public function date($name) { return $this->addColumn("`$name` DATE"); }
+    public function datetime($name) { return $this->addColumn("`$name` DATETIME"); }
+    public function time($name) { return $this->addColumn("`$name` TIME"); }
     public function boolean($name) { return $this->addColumn("`$name` TINYINT(1)"); }
     
     public function timestamps()

@@ -638,6 +638,9 @@ The `Blueprint` class supports the following column definitions and helpers:
 | `$table->string('name', $len)` | String column (default 255) | `` `name` VARCHAR($len) `` |
 | `$table->text('name')` | Long text column | `` `name` TEXT `` |
 | `$table->boolean('name')` | Boolean flag (0/1) | `` `name` TINYINT(1) `` |
+| `$table->date('name')` | Date only (YYYY-MM-DD) | `` `name` DATE `` |
+| `$table->datetime('name')` | Date & Time | `` `name` DATETIME `` |
+| `$table->time('name')` | Time only (HH:MM:SS) | `` `name` TIME `` |
 | `$table->timestamps()` | Standard Audit Columns | Adds `created_at`, `created_by`, `updated_at`, `updated_by` (all `INT`) |
 | `$table->softDelete()` | Soft Deletion Columns | Adds `deleted_at`, `deleted_by` (all `INT`) |
 
