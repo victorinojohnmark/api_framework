@@ -597,7 +597,7 @@ php database/create_migration.php CreateUsersTable
 
 This generates a file in `database/migrations/` pre-filled with the Schema Builder template and default utility columns (`active`, `timestamps`, `softDelete`).
 
-### Editing the Migration
+**Editing the Migration**
 The framework uses a fluent `Schema` and `Blueprint` system, so you don't have to write raw SQL.
 
 **Creating a Table:**
@@ -627,8 +627,39 @@ public function down()
 }
 ```
 
-**Modifying a Table:**
-Use `Schema::table()` to add, modify, or drop columns.
+### Available Column Types
+The `Blueprint` class supports the following column definitions and helpers:
+
+| Method | Description | SQL Generated |
+| :--- | :--- | :--- |
+| `$table->id()` | Default Primary Key | `id INT AUTO_INCREMENT PRIMARY KEY` |
+| `$table->increments('name')` | Custom Primary Key | `` `name` INT AUTO_INCREMENT PRIMARY KEY `` |
+| `$table->integer('name')` | Integer column | `` `name` INT `` |
+| `$table->string('name', $len)` | String column (default 255) | `` `name` VARCHAR($len) `` |
+| `$table->text('name')` | Long text column | `` `name` TEXT `` |
+| `$table->boolean('name')` | Boolean flag (0/1) | `` `name` TINYINT(1) `` |
+| `$table->timestamps()` | Standard Audit Columns | Adds `created_at`, `created_by`, `updated_at`, `updated_by` (all `INT`) |
+| `$table->softDelete()` | Soft Deletion Columns | Adds `deleted_at`, `deleted_by` (all `INT`) |
+
+### Column Modifiers
+You can chain these methods to modify the column definition:
+
+| Method | Description | Example |
+| :--- | :--- | :--- |
+| `->nullable()` | Allows NULL values | `$table->string('notes')->nullable()` |
+| `->default($value)` | Sets a default value | `$table->boolean('is_active')->default(1)` |
+| `->unique()` | Enforces unique constraint | `$table->string('email')->unique()` |
+| `->change()` | Modifies an existing column | `$table->string('name', 100)->change()` |
+
+### Table Commands
+
+| Method | Description | SQL Generated |
+| :--- | :--- | :--- |
+| `$table->dropColumn('name')` | Removes a column | `` DROP COLUMN `name` `` |
+| `$table->renameColumn('old', 'new', 'DEF')` | Renames a column | `` CHANGE COLUMN `old` `new` DEF `` |
+
+### Modifying a Table
+Use `Schema::table()` to add, modify, or drop columns in an existing table.
 
 ```php
 public function up()
@@ -666,9 +697,10 @@ php database/migrate.php
 
 ### Rolling Back
 Undo the last batch of migrations (executes the `down()` method):
-```bash
+```php
 php database/rollback.php
 ```
+
 
 ---
 
