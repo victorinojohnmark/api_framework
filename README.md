@@ -110,7 +110,7 @@ php serve.php
  ---
 
 ## 2. Routing
-Define all API endpoints in `routes/api.php`. The framework supports standard HTTP verbs, dynamic parameters, groups, and middleware filtering.
+Define all API endpoints in `routes/api.php`. The framework supports standard HTTP verbs, dynamic parameters, groups, and explicit middleware assignment.
 
 ### 2.1 Basic Routes
 ```php
@@ -124,7 +124,8 @@ $router->post('/auth/login', 'AuthController@login');
 ```
 
 ### 2.2 Dynamic Parameters
-You can capture segments of the URL using `{curly_braces}`. These are passed as arguments to your controller method.
+You can capture segments of the URL using `{curly_braces}`. These are passed as arguments to your controller method in the order they appear.
+
 ```php
 // Capture a single ID -> show($id)
 $router->get('/users/{id}', 'UserController@show');
@@ -134,28 +135,43 @@ $router->get('/users/{id}', 'UserController@show');
 $router->get('/projects/{project_id}/tasks/{task_id}', 'TaskController@show');
 ```
 
-### 2.3 Route Groups & Middleware
-You can group routes to apply a common URL prefix or middleware.
+### 2.3 Middleware on Routes
+You can attach middleware to individual routes by passing a third argument. This can be a single string or an array of middleware keys.
+
+```php
+// Single Middleware
+$router->post('/logout', 'AuthController@logout', 'auth');
+
+// Multiple Middleware
+// Order matters: 'auth' runs first, then 'verified_only'
+$router->delete('/users/{id}', 'AdminController@delete', ['auth', 'verified_only']);
+```
+
+### 2.4 Route Groups
+Groups allow you to apply a shared URL prefix and/or middleware to multiple routes at once.
+
 ```php
 // Group routes under '/admin' with 'auth' middleware
 $router->group(['prefix' => '/admin', 'middleware' => ['auth']], function($router) {
     
     // Final URL: /admin/dashboard
-    // Middleware: ['auth']
+    // Inherited Middleware: ['auth']
     $router->get('/dashboard', 'AdminController@dashboard');
 
-    // Final URL: /admin/settings
-    $router->get('/settings', 'AdminController@settings');
+    // Add EXTRA middleware to a specific route inside the group
+    // Final Middleware: ['auth', 'super_admin']
+    $router->delete('/logs', 'AdminController@clearLogs', 'super_admin');
     
 });
 ```
 
-### 2.4 Excluding Middleware
+### 2.5 Excluding Middleware
 If you apply middleware to a group but need to make a specific route public, you can chain `excludeMiddleware`.
+
 ```php
 $router->group(['prefix' => '/api', 'middleware' => ['auth']], function($router) {
 
-    // Protected Route
+    // Protected Route (Uses 'auth')
     $router->get('/profile', 'UserController@profile');
 
     // Public Route (Auth middleware removed for this specific route)
