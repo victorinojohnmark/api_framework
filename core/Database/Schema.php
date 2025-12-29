@@ -1,13 +1,11 @@
 <?php
 namespace Core\Database;
 
-use Core\Database;
-
 class Schema
 {
     protected static $db;
 
-    public static function setConnection(Database $db)
+    public static function setConnection($db)
     {
         self::$db = $db;
     }
@@ -37,7 +35,12 @@ class Schema
      */
     public static function rename($from, $to)
     {
-        self::$db->query("RENAME TABLE `$from` TO `$to`");
+        // Check if we are using PDO (exec) or Custom DB (query)
+        if (self::$db instanceof \PDO) {
+            self::$db->exec("RENAME TABLE `$from` TO `$to`");
+        } else {
+            self::$db->query("RENAME TABLE `$from` TO `$to`");
+        }
     }
 
     /**
@@ -45,12 +48,20 @@ class Schema
      */
     public static function drop($table)
     {
-        self::$db->query("DROP TABLE `$table`");
+        if (self::$db instanceof \PDO) {
+            self::$db->exec("DROP TABLE `$table`");
+        } else {
+            self::$db->query("DROP TABLE `$table`");
+        }
     }
 
     public static function dropIfExists($table)
     {
-        self::$db->query("DROP TABLE IF EXISTS `$table`");
+        if (self::$db instanceof \PDO) {
+            self::$db->exec("DROP TABLE IF EXISTS `$table`");
+        } else {
+            self::$db->query("DROP TABLE IF EXISTS `$table`");
+        }
     }
 
     /**
@@ -60,7 +71,12 @@ class Schema
     {
         $sql = $blueprint->build();
         if ($sql) {
-            self::$db->query($sql);
+            // Support both Raw PDO and your Core\Database wrapper
+            if (self::$db instanceof \PDO) {
+                self::$db->exec($sql);
+            } else {
+                self::$db->query($sql);
+            }
         }
     }
 }
